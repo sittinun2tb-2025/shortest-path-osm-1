@@ -1,0 +1,12 @@
+# Large generated data (regenerate via rum-1-graph.py)
+osm_graph.gpkg
+
+# OSM API cache
+cache/
+
+# Python
+__pycache__/
+*.pyc
+
+# Claude Code
+.claude/
