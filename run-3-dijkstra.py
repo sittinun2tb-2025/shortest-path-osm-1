@@ -42,18 +42,6 @@ osmid_end = params.osmid_end
 list_nodes = obj_nodes['osmid'].tolist() # List of node IDs
 
 # DEFUALT VALUE
-# 1) list node v (vertex) all network
-# 2) add column status=False (defualt)
-# 3) add column distance="inf" (defualt)
-# 4) add column count=-1 (defualt)
-
-# df_nodes = pd.DataFrame({
-#     'v': list_nodes, 
-#     'status': False,
-#     'distance': float('inf'),
-#     'count': -1
-#     })
-
 dist_m = 0.0
 num_path = 1
 
