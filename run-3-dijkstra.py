@@ -6,15 +6,15 @@ import sys
 import pickle
 import pandas as pd
 import geopandas as gpd
+import heapq
 
 import params
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 
 dir_edges_pkl = os.path.join(params.dir_app, 'osm_edges.pkl')
 dir_nodes_pkl = os.path.join(params.dir_app, 'osm_nodes.pkl')
-
-# Create output file
-dir_output_gpkg = os.path.join(params.dir_app, 'osm_output.gpkg')
 
 obj_edges = pd.read_pickle(dir_edges_pkl) #read the pickle file
 obj_nodes = pd.read_pickle(dir_nodes_pkl) #read the pickle file
@@ -34,96 +34,123 @@ def Find_NodeID_Connect(edges, node_id):
 
 # osmid start
 osmid_u = params.osmid_u
+osmid_v = 0
 # osmid end
 osmid_end = params.osmid_end
 
+# Begin distances with infinity
+list_nodes = obj_nodes['osmid'].tolist() # List of node IDs
 
-node_order = [osmid_u]
-osmid_v = 0
+# DEFUALT VALUE
+# 1) list node v (vertex) all network
+# 2) add column status=False (defualt)
+# 3) add column distance="inf" (defualt)
+# 4) add column count=-1 (defualt)
 
-dict_finding_path = {
-    'origin': None,
-    'destinate': [None],
-    'count_path': 0,
-    'sum_length': 0.0
-}
+# df_nodes = pd.DataFrame({
+#     'v': list_nodes, 
+#     'status': False,
+#     'distance': float('inf'),
+#     'count': -1
+#     })
 
-list_finding_path = []  
+dist_m = 0.0
+num_path = 1
 
+# ── Dijkstra ─────────────────────────────────────────────────────────────────
+priority_queue = [(0.0, osmid_u)]          # (cumulative_cost, node)
+visited       = set()
+dist_map      = {int(n): float('inf') for n in list_nodes}
+dist_map[osmid_u] = 0.0
+prev_map      = {}                         # predecessor ของแต่ละ node
+result_rows   = []
+step          = 0
 
-while 1:
-    # Check if the destination node is end point
-    if osmid_u == osmid_end:
-        break
+while priority_queue:
+    curr_cost, curr_node = heapq.heappop(priority_queue)
 
-    # Find connected edges from the current node
-    ds_edges = Find_NodeID_Connect(obj_edges, osmid_u)
-    
-    # origin node
-    dict_finding_path['origin'] = osmid_u
-
-    if ds_edges.empty:
-        break
-    
-    # find node is connected to destination node
-    for idx, row in ds_edges.iterrows():
-        # Check node v is already in list
-        if row['v'] in node_order:
-            continue
-        # Next node
-        osmid_v = row['v']
-        print ("Test: %s -> %s, Length: %s" % (osmid_u, osmid_v, row['length']))
-
-    # switch node
-    osmid_u = osmid_v
-
-    # update path information
-    dict_finding_path['destinate'] = osmid_v
-    dict_finding_path['sum_length'] += row['length']
-    dict_finding_path['count_path'] += 1
-    list_finding_path.append(dict_finding_path.copy())
-
-    # Check if the node is already in list
-    if osmid_u not in node_order:
-        node_order.append(osmid_u)
-    else:
-        break
-
-#print ("Node order: %s" % node_order)
-
-df = pd.DataFrame(list_finding_path)
-print(df)
-
-
-
-
-# Check if the destination node is End Point
-if osmid_u != osmid_end:
-    print ("No path found from %s to %s" % (osmid_u, osmid_end))
-
-# Calculate path by osmid
-s_u = 0
-s_v = 0
-list_segment = []
-
-for i in node_order:
-    if s_u == 0:
-        s_u = i
+    if curr_node in visited:
         continue
-    s_v = i
-    #print ("Path: %s -> %s" % (s_u, s_v))
-    segment = obj_edges[(obj_edges['u'] == s_u) & (obj_edges['v'] == s_v)]
-    #print (segment[['osmid', 'u', 'v', 'length', 'oneway', 'geometry']])
-    list_segment.append(segment)
-    s_u = s_v   
 
-# Combine all segments into a Output.gpkg
-df_segment = pd.concat(list_segment, ignore_index=True)
-gdf_segment = gpd.GeoDataFrame(df_segment, geometry='geometry')
-gdf_segment.set_crs(epsg=4326, inplace=True)
-gdf_segment.to_file(dir_output_gpkg, layer='segments', driver='GPKG')
+    visited.add(curr_node)
+    step += 1
+
+    #conn = Find_NodeID_Connect(obj_edges, curr_node)[['u', 'v', 'length']].values.tolist()
+    conn = Find_NodeID_Connect(obj_edges, curr_node)[['u', 'v', 'length', 'geometry']].values.tolist()
 
 
+    for u, v, length, geometry in conn:
+        u      = int(u)
+        v      = int(v)
+        length = round(float(length), 2)
+
+        if v in visited:
+            result_rows.append({'u': u, 'v': v, 'distance': length, 'status': 'F', 'count_section': 0, 'geometry': geometry})
+        else:
+            new_cost = curr_cost + length
+            if new_cost < dist_map.get(v, float('inf')):
+                dist_map[v] = new_cost
+                prev_map[v] = u            # บันทึก predecessor เมื่อพบเส้นทางสั้นกว่า
+                heapq.heappush(priority_queue, (new_cost, v))
+            result_rows.append({'u': u, 'v': v, 'distance': length, 'status': 'T', 'count_section': step, 'geometry': geometry})
+
+    if curr_node == osmid_end:
+        break
+
+df_result = pd.DataFrame(result_rows, columns=['u', 'v', 'distance', 'status', 'count_section', 'geometry'])
+
+# ── Print table ───────────────────────────────────────────────────────────────
+#print(df_result.head()) # Example rows limit 5
+
+# ── Path reconstruction จาก prev_map ─────────────────────────────────────────
+path = []
+node = osmid_end
+while node in prev_map:
+    path.append(node)
+    node = prev_map[node]
+path.append(osmid_u)
+path.reverse()
+
+# ดึง distance ของแต่ละ edge บนเส้นทางจาก df_result
+path_rows = []
+for i in range(len(path) - 1):
+    u_node = path[i]
+    v_node = path[i + 1]
+    edge = df_result[(df_result['u'] == u_node) & (df_result['v'] == v_node)]
+    dist_edge = edge['distance'].values[0] if len(edge) > 0 else float('nan')
+    # add geometry LINESTRING from osm_edges
+    geom_row  = obj_edges[(obj_edges['u'] == u_node) & (obj_edges['v'] == v_node)]
+    geometry  = geom_row['geometry'].values[0] if len(geom_row) > 0 else None
+
+    path_rows.append({'gid': i + 1, 'u': u_node, 'v': v_node, 'distance_m': dist_edge, 'geometry': geometry})
+
+path_rows.append({
+    'gid': len(path), 
+    'u': path[-1], 
+    'v': '-', 
+    'distance_m': 0.0,
+    'geometry': geometry
+})
+df_path = pd.DataFrame(path_rows)
+df_path.drop(df_path[df_path.distance_m == 0.0].index, inplace=True)
+
+# Convert DataFrame to GeoDataFrame
+gdf_path = gpd.GeoDataFrame(df_path, geometry='geometry', crs="EPSG:4326")
+
+# ── Print เส้นทาง ─────────────────────────────────────────────────────────────
+total_dist = round(dist_map.get(osmid_end, float('nan')), 2)
+print("\n" + "=" * 75)
+print(f"เส้นทางเลี่ยงน้ำท่วม: {osmid_u} -> {osmid_end}")
+print(f"จำนวน vertex ที่ผ่าน: {len(df_path)} จุด (รวมต้นทางและปลายทาง)")
+print(f"ระยะทางรวม: { total_dist } เมตร")
+print("=" * 75)
+print(df_path[['gid', 'u', 'v', 'distance_m']].to_string(index=False))
+print("=" * 75)
+
+# ── บันทึก GeoPackage ─────────────────────────────────────────────────────────
+dir_output_gpkg = os.path.join(params.dir_app, 'osm_output.gpkg')
+gdf_path.to_file(dir_output_gpkg, layer='dijkstra_v3', driver='GPKG')
+print(f"\nบันทึกไฟล์: {dir_output_gpkg}")
 
 
 
@@ -134,45 +161,3 @@ gdf_segment.to_file(dir_output_gpkg, layer='segments', driver='GPKG')
 
 
 
-
-
-# while num < count:  
-#     edges_to_node = Find_NodeID_Connect(obj_edges, osmid_start) 
-#     print (edges_to_node[['u', 'v', 'length', 'oneway']]) 
-    
-#     for index, row in edges_to_node.iterrows():
-#         if osmid_end == row['v']:
-#             osmid = osmid_end
-#             break
-        
-#         osm_next = row['v']
-#         print ("START: %s -> NEXT: %s" % (osmid_start, osm_next))
-
-#     osmid_start = osm_next
-#     num += 1    
-
-
-# edges_to_node['v'].values[0]
-
-
-#while True:
-#    edges_to_node = Find_NodeID_Connect(obj_edges, osmid_start) 
-#    print (edges_to_node[['u', 'v', 'length', 'oneway']]) 
-
-
-
-#edges_to_node = Find_NodeID_Connect(obj_edges, osmid_start) 
-#print (edges_to_node[['u', 'v', 'length', 'oneway']]) 
-
-#edges_to_start = edges_to_node[edges_to_node['u'] == osmid_start] # Find edges where 'u' is the node_id
-#print (edges_to_start[['u', 'v', 'length', 'oneway']]) 
-
-#osmid_start = edges_to_start['v'].values[0] # Get the 'v' value from the first row of edges_to_start
-#print (osmid_start)
-
-#edges_to_node = Find_NodeID_Connect(obj_edges, osmid_start) 
-#print (edges_to_node[['u', 'v', 'length', 'oneway']])
-
-
-#if __name__ == "__main__":
-#    pass
