@@ -8,9 +8,9 @@
 
 โปรเจกต์นี้ดาวน์โหลดข้อมูลโครงข่ายถนนจาก OpenStreetMap บริเวณกรุงเทพมหานคร แล้วคำนวณเส้นทางสั้นที่สุดระหว่าง 2 จุด โดยรองรับการนำเข้า Layer น้ำท่วม (GeoPackage) เพื่อสร้างเส้นทางเลี่ยงแบบ Dynamic
 
-```
-ดาวน์โหลด OSM → แปลงเป็น Pickle → คำนวณ Dijkstra → Export GeoPackage → แสดงผลใน QGIS
-```
+## Workflow Diagram
+
+![Workflow Pipeline](docs/workflow.png)
 
 ---
 
@@ -112,6 +112,12 @@ python run-4-flood-detour.py
 | Node ปลายทาง | `1688725137` | `1688725137` |
 | Output layer | `dijkstra_v3` | `flood_detour` |
 | Edge ที่ถูกบล็อก | — | ตรวจจากการ intersect กับ `flood-1.gpkg` |
+
+## แผนที่เส้นทาง
+
+![Route Map](docs/route_map.png)
+
+> **สีน้ำเงิน** = เส้นทางสั้นที่สุด (Dijkstra) &nbsp;|&nbsp; **สีเขียวประ** = เส้นทางเลี่ยงน้ำท่วม &nbsp;|&nbsp; **สีแดง** = พื้นที่น้ำท่วม
 
 ---
 
