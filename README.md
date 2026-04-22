@@ -18,9 +18,9 @@
 
 | | OSM Node ID | พิกัด (lon, lat) |
 |---|---|---|
-| ต้นทาง | `269740740` | 100.5044646, 13.7480028 |
-| ปลายทาง | `2078129009` | 100.5546609, 13.7410995 |
-| Buffer radius | — | 500 เมตร |
+| ต้นทาง | `10899463149` | 100.5044646, 13.7480028 |
+| ปลายทาง | `1688725137` | 100.5546609, 13.7410995 |
+| Buffer radius | — | 3,000 เมตร |
 
 ---
 
@@ -31,14 +31,13 @@ shortest-path-osm-1/
 ├── params.py                  # Config: จุดเริ่มต้น/ปลายทาง, buffer distance
 ├── rum-1-graph.py             # Stage 1: ดาวน์โหลด OSM → osm_graph.gpkg
 ├── run-2-pkl.py               # Stage 2: แปลง GeoPackage → pickle (edges/nodes)
-├── run-3-dijkstra_v2.py       # Stage 3: Dijkstra + path reconstruction
+├── run-3-dijkstra.py          # Stage 3: Dijkstra + path reconstruction (หลัก)
 ├── run-3-shortest.py          # Stage 3 (alt): OSMnx built-in shortest path
-├── run-3-dijkstra.py          # Stage 3 (v1): Greedy path (เวอร์ชันเก่า)
 ├── run-4-flood-detour.py      # Stage 4: Dijkstra หลีกเลี่ยงพื้นที่น้ำท่วม
 ├── flood-1.gpkg               # Layer น้ำท่วม (MultiPolygon, EPSG:4326)
 ├── osm_edges.pkl              # Pickle: edges GeoDataFrame
 ├── osm_nodes.pkl              # Pickle: nodes GeoDataFrame
-├── osm_output.gpkg            # Output: เส้นทางจาก Dijkstra v1
+├── osm_output.gpkg            # Output: เส้นทางจาก Dijkstra (layer: dijkstra_v3)
 ├── osm_output_shortest.gpkg   # Output: เส้นทางจาก OSMnx
 ├── osm_flood_detour.gpkg      # Output: เส้นทางเลี่ยงน้ำท่วม
 ├── output.xlsx                # ตารางผลลัพธ์การวิเคราะห์
@@ -76,24 +75,10 @@ python run-2-pkl.py
 ### Stage 3 — คำนวณเส้นทางสั้นที่สุด (Dijkstra)
 
 ```bash
-python run-3-dijkstra_v2.py
+python run-3-dijkstra.py
 ```
 
-แสดงตาราง Dijkstra และเส้นทาง:
-
-```
-============================================================
-เส้นทางสั้นที่สุด: 269740740 -> 2078129009
-จำนวน vertex ที่ผ่าน: 4 จุด (รวมต้นทางและปลายทาง)
-ระยะทางรวม: 476.58 เมตร
-============================================================
- order     vertex next_vertex  edge_distance
-     1  269740740  2078129004         202.69
-     2 2078129004  5941680681         170.00
-     3 5941680681  2078129009         103.89
-     4 2078129009           -           0.00
-============================================================
-```
+แสดงตาราง Dijkstra และเส้นทาง พร้อมบันทึกผลลัพธ์ไปยัง `osm_output.gpkg` (layer: `dijkstra_v3`)
 
 ### Stage 4 — คำนวณเส้นทางเลี่ยงน้ำท่วม
 
@@ -123,9 +108,10 @@ python run-4-flood-detour.py
 
 | | เส้นทางปกติ | เส้นทางเลี่ยงน้ำท่วม |
 |---|---|---|
-| จำนวน vertex | 4 จุด | 14 จุด |
-| ระยะทางรวม | 476.58 ม. | 1,155.31 ม. |
-| Edge ที่ถูกบล็อก | — | `2078129004 ↔ 5941680681` |
+| Node ต้นทาง | `10899463149` | `10899463149` |
+| Node ปลายทาง | `1688725137` | `1688725137` |
+| Output layer | `dijkstra_v3` | `flood_detour` |
+| Edge ที่ถูกบล็อก | — | ตรวจจากการ intersect กับ `flood-1.gpkg` |
 
 ---
 
