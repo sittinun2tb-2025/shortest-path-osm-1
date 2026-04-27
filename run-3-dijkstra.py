@@ -3,7 +3,6 @@
 
 import os
 import sys
-import pickle
 import pandas as pd
 import geopandas as gpd
 import heapq
@@ -18,32 +17,20 @@ dir_nodes_pkl = os.path.join(params.dir_app, 'osm_nodes.pkl')
 
 obj_edges = pd.read_pickle(dir_edges_pkl) #read the pickle file
 obj_nodes = pd.read_pickle(dir_nodes_pkl) #read the pickle file
-#print (obj_nodes)
 
 def Find_NodeID_Connect(edges, node_id):
     """ ผลลัพธ์ อาจไม่มี osmid ที่ไม่สามารถเดินทางไปยังจุดหมายได้ 
         เช่น osmid ที่เป็น dead end หรือ มีทางเดียว one way
     """
-    # Find the node_id in the 'u' and 'v' columns of the edges dataframe
-    #connected_edges = edges[(edges['u'] == node_id) | (edges['v'] == node_id)]
     conn_edges = edges[(edges['u'] == node_id)]
-    # select the edge with the minimum length
-    #conn_edges = conn_edges[ conn_edges['length'] == conn_edges['length'].min() ]
     return conn_edges
 
 
-# osmid start
 osmid_u = params.osmid_u
-osmid_v = 0
-# osmid end
 osmid_end = params.osmid_end
 
 # Begin distances with infinity
 list_nodes = obj_nodes['osmid'].tolist() # List of node IDs
-
-# DEFUALT VALUE
-dist_m = 0.0
-num_path = 1
 
 # ── Dijkstra ─────────────────────────────────────────────────────────────────
 priority_queue = [(0.0, osmid_u)]          # (cumulative_cost, node)
@@ -128,7 +115,7 @@ gdf_path = gpd.GeoDataFrame(df_path, geometry='geometry', crs="EPSG:4326")
 # ── Print เส้นทาง ─────────────────────────────────────────────────────────────
 total_dist = round(dist_map.get(osmid_end, float('nan')), 2)
 print("\n" + "=" * 75)
-print(f"เส้นทางเลี่ยงน้ำท่วม: {osmid_u} -> {osmid_end}")
+print(f"เส้นทาง: {osmid_u} -> {osmid_end}")
 print(f"จำนวน vertex ที่ผ่าน: {len(df_path)} จุด (รวมต้นทางและปลายทาง)")
 print(f"ระยะทางรวม: { total_dist } เมตร")
 print("=" * 75)
