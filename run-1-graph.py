@@ -11,11 +11,7 @@ graph = ox.graph_from_point(
     (params.centroid[1], params.centroid[0]), # lat, lon 
     dist=params.buffer_distance,  #units of meters
     network_type='drive',
-    simplify=False, 
-    #retain_all=False, 
-    #truncate_by_edge=False, 
-    #clean_periphery=None, 
-    #custom_filter=None
+    simplify=False
 ) 
 
 # Simplify the graph
