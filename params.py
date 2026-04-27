@@ -1,9 +1,9 @@
 # params.py
+
 import os
-import sys
 from shapely import Point, LineString
 
-dir_app = os.path.dirname(sys.argv[0])
+dir_app = os.path.dirname(os.path.abspath(__file__))
 
 start_p = Point(100.5044646, 13.7480028)
 end_p = Point(100.5546609, 13.7410995)
