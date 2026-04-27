@@ -14,15 +14,15 @@ sys.stdout.reconfigure(encoding='utf-8')
 # ── โหลดข้อมูล ────────────────────────────────────────────────────────────────
 dir_edges_pkl = os.path.join(params.dir_app, 'osm_edges.pkl')
 dir_nodes_pkl = os.path.join(params.dir_app, 'osm_nodes.pkl')
-dir_flood     = os.path.join(params.dir_app, 'flood-1.gpkg')
+dir_flood_pkl     = os.path.join(params.dir_app, 'flood-1.pkl')
 
 obj_edges = pd.read_pickle(dir_edges_pkl)
 obj_nodes = pd.read_pickle(dir_nodes_pkl)
-flood_gdf = gpd.read_file(dir_flood)
+obj_flood = pd.read_pickle(dir_flood_pkl)
 
 # ── หา edges ที่ถูกน้ำท่วมปิดกั้น ────────────────────────────────────────────
 edges_gdf     = gpd.GeoDataFrame(obj_edges, geometry='geometry', crs='EPSG:4326')
-flooded_edges = gpd.sjoin(edges_gdf, flood_gdf[['geometry']], how='inner', predicate='intersects')
+flooded_edges = gpd.sjoin(edges_gdf, obj_flood[['geometry']], how='inner', predicate='intersects')
 blocked_pairs = set(zip(flooded_edges['u'].astype(int), flooded_edges['v'].astype(int)))
 
 print("=" * 60)
@@ -31,9 +31,13 @@ print(flooded_edges[['u', 'v', 'length']].to_string(index=False))
 print("=" * 60)
 
 # ── ฟังก์ชันหา edges ที่เชื่อมต่อ (ยกเว้น blocked) ───────────────────────────
-def Find_NodeID_Connect(edges, node_id, blocked=set()):
+def Find_NodeID_Connect(edges, node_id, blocked=None):
+    if blocked is None:
+        blocked = set()
     conn = edges[edges['u'] == node_id]
-    conn = conn[~conn.apply(lambda r: (int(r['u']), int(r['v'])) in blocked, axis=1)]
+    if blocked:
+        idx = pd.MultiIndex.from_arrays([conn['u'].astype(int), conn['v'].astype(int)])
+        conn = conn[~idx.isin(blocked)]
     return conn
 
 # ── ค่าเริ่มต้น ───────────────────────────────────────────────────────────────
